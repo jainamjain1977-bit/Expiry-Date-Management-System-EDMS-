@@ -1,0 +1,457 @@
+!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expiry Date Management System (EDMS) Prototype</title>
+    <style>
+        :root {
+            --primary: #1e293b;
+            --accent: #2563eb;
+            --safe: #16a34a;
+            --warning-30: #eab308;
+            --warning-15: #f97316;
+            --danger-7: #dc2626;
+            --expired: #6b7280;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+        /* Sidebar Navigation */
+        #sidebar { width: 260px; background-color: var(--primary); color: #fff; display: flex; flex-direction: column; }
+        .brand { padding: 20px; font-size: 1.2rem; font-weight: bold; border-bottom: 1px solid #334155; }
+        .brand span { font-size: 0.8rem; color: #94a3b8; display: block; font-weight: normal; margin-top: 4px; }
+        .user-role-select { padding: 15px 20px; background: #0f172a; border-bottom: 1px solid #334155; }
+        .user-role-select select { width: 100%; padding: 8px; border-radius: 4px; border: none; background: #1e293b; color: #fff; font-weight: bold; }
+        .nav-links { list-style: none; margin-top: 10px; flex-grow: 1; }
+        .nav-links li a { display: block; padding: 12px 20px; color: #cbd5e1; text-decoration: none; transition: 0.2s; cursor: pointer; }
+        .nav-links li a:hover, .nav-links li a.active { background-color: var(--accent); color: white; }
+
+        /* Main Content */
+        #main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        header { background: var(--card-bg); padding: 15px 30px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .container { padding: 30px; max-width: 1400px; }
+
+        /* Metric Cards */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 5px solid var(--accent); }
+        .card.safe { border-left-color: var(--safe); }
+        .card.warn-30 { border-left-color: var(--warning-30); }
+        .card.warn-15 { border-left-color: var(--warning-15); }
+        .card.danger-7 { border-left-color: var(--danger-7); }
+        .card.expired { border-left-color: var(--expired); }
+        .card h3 { font-size: 0.85rem; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+        .card .value { font-size: 1.8rem; font-weight: bold; }
+
+        /* Panels & Forms */
+        .panel { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .panel h2 { font-size: 1.1rem; margin-bottom: 15px; color: var(--primary); }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 0.85rem; margin-bottom: 5px; font-weight: 600; color: #475569; }
+        .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; outline: none; }
+        .btn { padding: 10px 18px; border: none; border-radius: 4px; background: var(--accent); color: white; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-secondary { background: #64748b; }
+        .btn-danger { background: var(--danger-7); }
+
+        /* Data Tables */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #f1f5f9; color: #475569; font-weight: 600; }
+        tr:hover { background-color: #f8fafc; }
+
+        /* Status Flags */
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; color: white; display: inline-block; }
+        .badge-safe { background-color: var(--safe); }
+        .badge-30 { background-color: var(--warning-30); color: #000; }
+        .badge-15 { background-color: var(--warning-15); }
+        .badge-7 { background-color: var(--danger-7); }
+        .badge-expired { background-color: var(--expired); }
+
+        /* Hidden Sections */
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <div id="sidebar">
+        <div class="brand">
+            EDMS Prototype
+            <span>Expiry Management system</span>
+        </div>
+        <div class="user-role-select">
+            <label style="font-size: 0.75rem; color: #94a3b8;">ACTIVE USER ROLE:</label>
+            <select id="roleSelect" onchange="switchRole()">
+                <option value="Administrator">Administrator</option>
+                <option value="Inventory Manager">Inventory Manager</option>
+                <option value="Warehouse Staff">Warehouse Staff</option>
+                <option value="Auditor">Auditor</option>
+            </select>
+        </div>
+        <ul class="nav-links">
+            <li><a class="active" onclick="showView('dashboardView', this)">Dashboard</a></li>
+            <li><a id="navIntake" onclick="showView('intakeView', this)">Product & Batch Intake</a></li>
+            <li><a onclick="showView('inventoryView', this)">Inventory & FEFO Routing</a></li>
+            <li><a onclick="showView('barcodeView', this)">Barcode / QR Scanner Node</a></li>
+            <li><a onclick="showView('reportsView', this)">Report Generation Node</a></li>
+        </ul>
+    </div>
+
+    <!-- Main Content Area -->
+    <div id="main-content">
+        <header>
+            <h1 id="pageTitle" style="font-size: 1.3rem;">System Dashboard</h1>
+            <div id="systemClock" style="font-size: 0.9rem; font-weight: 600; color: #64748b;"></div>
+        </header>
+
+        <div class="container">
+
+            <!-- DASHBOARD VIEW -->
+            <div id="dashboardView" class="view-section active">
+                <div class="metrics-grid">
+                    <div class="card"><div class="value" id="valTotal">0</div><h3>Total Items</h3></div>
+                    <div class="card safe"><div class="value" id="valSafe">0</div><h3>Safe Stock</h3></div>
+                    <div class="card warn-30"><div class="value" id="val30">0</div><h3>Expiring &le; 30 Days</h3></div>
+                    <div class="card warn-15"><div class="value" id="val15">0</div><h3>Expiring &le; 15 Days</h3></div>
+                    <div class="card danger-7"><div class="value" id="val7">0</div><h3>Critical &le; 7 Days</h3></div>
+                    <div class="card expired"><div class="value" id="valExpired">0</div><h3>Expired Stock</h3></div>
+                </div>
+
+                <div class="panel">
+                    <h2>Live Expiry Alerts & Recommended FEFO Actions</h2>
+                    <table id="dashboardAlertsTable">
+                        <thead>
+                            <tr>
+                                <th>Batch ID</th>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Qty</th>
+                                <th>Expiry Date</th>
+                                <th>Days Left</th>
+                                <th>Status Alert</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- INTAKE VIEW -->
+            <div id="intakeView" class="view-section">
+                <div class="panel">
+                    <h2>Data Ingestion: Add New Product / Batch</h2>
+                    <form id="intakeForm" onsubmit="handleDataIngestion(event)">
+                        <div class="form-grid">
+                            <div class="form-group"><label>Product ID</label><input type="text" id="inpProdID" required placeholder="PROD-001"></div>
+                            <div class="form-group"><label>Product Name</label><input type="text" id="inpProdName" required placeholder="Amoxicillin 500mg"></div>
+                            <div class="form-group"><label>Category</label><input type="text" id="inpCategory" required placeholder="Pharmaceuticals"></div>
+                            <div class="form-group"><label>Batch Number</label><input type="text" id="inpBatchNo" required placeholder="BATCH-8821"></div>
+                            <div class="form-group"><label>Quantity</label><input type="number" id="inpQty" min="1" required placeholder="100"></div>
+                            <div class="form-group"><label>Manufacturing Date</label><input type="date" id="inpMfgDate" required></div>
+                            <div class="form-group"><label>Expiry Date</label><input type="date" id="inpExpDate" required></div>
+                            <div class="form-group"><label>Supplier Name</label><input type="text" id="inpSupplier" required placeholder="Apex Pharma Corp"></div>
+                            <div class="form-group"><label>Storage Location</label><input type="text" id="inpLocation" required placeholder="Rack B3"></div>
+                        </div>
+                        <button type="submit" class="btn" style="margin-top: 15px;">Ingest & Store Batch Data</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- INVENTORY & FEFO VIEW -->
+            <div id="inventoryView" class="view-section">
+                <div class="panel">
+                    <h2>Active Inventory (Prioritized by FEFO - First Expired, First Out)</h2>
+                    <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 10px;">
+                        * Note: Products that are fully expired are automatically removed from active inventory visibility.
+                    </p>
+                    <table id="inventoryTable">
+                        <thead>
+                            <tr>
+                                <th>FEFO Rank</th>
+                                <th>Product ID</th>
+                                <th>Product Name</th>
+                                <th>Batch No</th>
+                                <th>Location</th>
+                                <th>Quantity</th>
+                                <th>Expiry Date</th>
+                                <th>Days Remaining</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- BARCODE SCANNER VIEW -->
+            <div id="barcodeView" class="view-section">
+                <div class="panel">
+                    <h2>Barcode / QR Scanner Node Simulator</h2>
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <input type="text" id="barcodeInput" placeholder="Scan or enter Batch/Barcode (e.g. BATCH-8821)..." style="flex-grow: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                        <button class="btn" onclick="simulateBarcodeScan()">Simulate Scan</button>
+                    </div>
+                    <div id="scanResult" style="padding: 15px; background: #f1f5f9; border-radius: 4px; display: none;">
+                        <h3>Scanned Item Identification:</h3>
+                        <div id="scanDetails" style="margin-top: 10px; font-size: 0.95rem;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPORTS VIEW -->
+            <div id="reportsView" class="view-section">
+                <div class="panel">
+                    <h2>Report Generation Node</h2>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button class="btn btn-secondary" onclick="generateReport('ALL')">All Records</button>
+                        <button class="btn btn-secondary" onclick="generateReport('NEAR_EXPIRY')">Near Expiry Report</button>
+                        <button class="btn btn-secondary" onclick="generateReport('EXPIRED')">Expired Products Report</button>
+                        <button class="btn" onclick="window.print()">Print / Export PDF</button>
+                    </div>
+                    <table id="reportsTable">
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Batch No</th>
+                                <th>Category</th>
+                                <th>Supplier</th>
+                                <th>Qty</th>
+                                <th>Mfg Date</th>
+                                <th>Expiry Date</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Seed Initial Inventory Data
+        let mockInventory = [];
+
+        let currentReportFilter = 'ALL';
+
+        function getOffsetDate(days) {
+            let d = new Date();
+            d.setDate(d.getDate() + days);
+            return d.toISOString().split('T')[0];
+        }
+
+        function calculateDaysDiff(expiryString) {
+            let expDate = new Date(expiryString);
+            let today = new Date();
+            today.setHours(0,0,0,0);
+            expDate.setHours(0,0,0,0);
+            let diffTime = expDate - today;
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function getStatusFlag(days) {
+            if (days < 0) return { label: 'Expired', class: 'badge-expired' };
+            if (days <= 7) return { label: 'Critical (≤7d)', class: 'badge-7' };
+            if (days <= 15) return { label: 'Urgent (≤15d)', class: 'badge-15' };
+            if (days <= 30) return { label: 'Near Expiry (≤30d)', class: 'badge-30' };
+            return { label: 'Safe Stock', class: 'badge-safe' };
+        }
+
+        function refreshDashboard() {
+            let total = mockInventory.length;
+            let safe = 0, d30 = 0, d15 = 0, d7 = 0, expired = 0;
+            let alertTableBody = document.querySelector('#dashboardAlertsTable tbody');
+            alertTableBody.innerHTML = '';
+
+            mockInventory.forEach(item => {
+                let days = calculateDaysDiff(item.exp);
+                let flag = getStatusFlag(days);
+
+                if (days < 0) expired++;
+                else if (days <= 7) { d7++; d15++; d30++; }
+                else if (days <= 15) { d15++; d30++; }
+                else if (days <= 30) { d30++; }
+                else safe++;
+
+                if (days <= 30) {
+                    let tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><b>${item.batch}</b></td>
+                        <td>${item.name}</td>
+                        <td>${item.cat}</td>
+                        <td>${item.qty}</td>
+                        <td>${item.exp}</td>
+                        <td>${days < 0 ? 'Expired (' + Math.abs(days) + ' days ago)' : days + ' Days'}</td>
+                        <td><span class="badge ${flag.class}">${flag.label}</span></td>
+                    `;
+                    alertTableBody.appendChild(tr);
+                }
+            });
+
+            document.getElementById('valTotal').innerText = total;
+            document.getElementById('valSafe').innerText = safe;
+            document.getElementById('val30').innerText = d30;
+            document.getElementById('val15').innerText = d15;
+            document.getElementById('val7').innerText = d7;
+            document.getElementById('valExpired').innerText = expired;
+        }
+
+        function renderInventory() {
+            let tbody = document.querySelector('#inventoryTable tbody');
+            tbody.innerHTML = '';
+
+            let sorted = [...mockInventory]
+                .filter(i => calculateDaysDiff(i.exp) >= 0)
+                .sort((a, b) => new Date(a.exp) - new Date(b.exp));
+
+            sorted.forEach((item, index) => {
+                let days = calculateDaysDiff(item.exp);
+                let flag = getStatusFlag(days);
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>Rank #${index + 1}</b></td>
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.batch}</td>
+                    <td>${item.location}</td>
+                    <td>${item.qty}</td>
+                    <td>${item.exp}</td>
+                    <td>${days} Days</td>
+                    <td><span class="badge ${flag.class}">${flag.label}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleDataIngestion(e) {
+            e.preventDefault();
+            let newBatch = {
+                id: document.getElementById('inpProdID').value,
+                name: document.getElementById('inpProdName').value,
+                cat: document.getElementById('inpCategory').value,
+                batch: document.getElementById('inpBatchNo').value,
+                qty: parseInt(document.getElementById('inpQty').value),
+                mfg: document.getElementById('inpMfgDate').value,
+                exp: document.getElementById('inpExpDate').value,
+                supplier: document.getElementById('inpSupplier').value,
+                location: document.getElementById('inpLocation').value
+            };
+
+            mockInventory.push(newBatch);
+            alert('Data Ingestion Successful! Product batch committed to database.');
+            document.getElementById('intakeForm').reset();
+            refreshDashboard();
+            renderInventory();
+        }
+
+        function simulateBarcodeScan() {
+            let query = document.getElementById('barcodeInput').value.trim().toLowerCase();
+            let resDiv = document.getElementById('scanResult');
+            let detDiv = document.getElementById('scanDetails');
+
+            let found = mockInventory.find(i => i.batch.toLowerCase() === query || i.id.toLowerCase() === query);
+
+            resDiv.style.display = 'block';
+            if (found) {
+                let days = calculateDaysDiff(found.exp);
+                let flag = getStatusFlag(days);
+                detDiv.innerHTML = `
+                    <p><b>Product ID:</b> ${found.id} | <b>Name:</b> ${found.name}</p>
+                    <p><b>Batch Number:</b> ${found.batch} | <b>Location:</b> ${found.location}</p>
+                    <p><b>Quantity:</b> ${found.qty} | <b>Supplier:</b> ${found.supplier}</p>
+                    <p><b>Expiry Date:</b> ${found.exp} (${days} days remaining)</p>
+                    <p style="margin-top:8px;"><b>Status:</b> <span class="badge ${flag.class}">${flag.label}</span></p>
+                `;
+            } else {
+                detDiv.innerHTML = `<span style="color: var(--danger-7);">No matching product or batch barcode found in the database.</span>`;
+            }
+        }
+
+        function generateReport(filter) {
+            currentReportFilter = filter;
+            let tbody = document.querySelector('#reportsTable tbody');
+            tbody.innerHTML = '';
+
+            let filtered = mockInventory.filter(item => {
+                let days = calculateDaysDiff(item.exp);
+                if (filter === 'NEAR_EXPIRY') return days >= 0 && days <= 30;
+                if (filter === 'EXPIRED') return days < 0;
+                return true;
+            });
+
+            filtered.forEach(item => {
+                let days = calculateDaysDiff(item.exp);
+                let flag = getStatusFlag(days);
+                let tr = document.createElement('tr');
+                
+                let actionButton = days < 0 
+                    ? `<button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteBatch('${item.batch}')">Write-Off / Delete</button>`
+                    : `<span style="color: #64748b; font-size: 0.8rem;">Active</span>`;
+
+                tr.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.batch}</td>
+                    <td>${item.cat}</td>
+                    <td>${item.supplier}</td>
+                    <td>${item.qty}</td>
+                    <td>${item.mfg}</td>
+                    <td>${item.exp}</td>
+                    <td><span class="badge ${flag.class}">${flag.label}</span></td>
+                    <td>${actionButton}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteBatch(batchNumber) {
+            let role = document.getElementById('roleSelect').value;
+            if (role !== 'Administrator' && role !== 'Inventory Manager') {
+                alert('Permission Denied: Only Administrators and Inventory Managers can delete or write off records.');
+                return;
+            }
+
+            if (confirm(`Are you sure you want to write-off and delete batch: ${batchNumber}?`)) {
+                mockInventory = mockInventory.filter(item => item.batch !== batchNumber);
+                alert(`Batch ${batchNumber} has been successfully deleted.`);
+                refreshDashboard();
+                renderInventory();
+                generateReport(currentReportFilter);
+            }
+        }
+
+        function showView(viewId, element) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            element.classList.add('active');
+
+            if(viewId === 'inventoryView') renderInventory();
+            if(viewId === 'reportsView') generateReport('ALL');
+        }
+
+        function switchRole() {
+            let role = document.getElementById('roleSelect').value;
+            let navIntake = document.getElementById('navIntake');
+            if (role === 'Auditor') {
+                navIntake.style.display = 'none';
+            } else {
+                navIntake.style.display = 'block';
+            }
+            generateReport(currentReportFilter);
+        }
+
+        // Initialize clock & data on startup
+        document.getElementById('systemClock').innerText = 'System Date: ' + new Date().toISOString().split('T')[0];
+        refreshDashboard();
+    </script>
+</body>
+</html>
